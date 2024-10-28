@@ -4,7 +4,7 @@ import "log"
 
 func main() {
 	server := CreateServer(Config{
-		ListenAddr: ":3000",
+		ListenAddr: ":4221",
 	})
 
 	log.Fatal(server.Start())
