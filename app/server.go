@@ -1,30 +1,64 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"log/slog"
 	"net"
-	"os"
 )
 
-// Ensures gofmt doesn't remove the "net" and "os" imports above (feel free to remove this!)
-var _ = net.Listen
-var _ = os.Exit
+const defaultListenAdrr = ":3000"
 
-func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
+type Config struct {
+	ListenAddr string
+}
 
-	// Uncomment this block to pass the first stage
-	//
-	// l, err := net.Listen("tcp", "0.0.0.0:4221")
-	// if err != nil {
-	// 	fmt.Println("Failed to bind to port 4221")
-	// 	os.Exit(1)
-	// }
-	//
-	// _, err = l.Accept()
-	// if err != nil {
-	// 	fmt.Println("Error accepting connection: ", err.Error())
-	// 	os.Exit(1)
-	// }
+type Server struct {
+	Config
+	Ln  net.Listener
+	Ctx context.Context
+}
+
+func CreateServer(cfg Config) *Server {
+	if len(cfg.ListenAddr) == 0 {
+		cfg.ListenAddr = defaultListenAdrr
+	}
+	return &Server{
+		Config: cfg,
+		Ctx:    context.Background(),
+	}
+}
+
+func (s *Server) Start() error {
+	ln, err := net.Listen("tcp", s.ListenAddr)
+	defer ln.Close()
+
+	if err != nil {
+		return err
+	}
+	s.Ln = ln
+
+	s.acceptConns()
+	return nil
+}
+
+func (s *Server) acceptConns() {
+	ctx, cancel := context.WithCancel(s.Ctx)
+	defer cancel()
+
+	for {
+		conn, err := s.Ln.Accept()
+
+		if err != nil {
+			slog.Error("accepting conn err :", err)
+			continue
+		}
+	}
+}
+
+func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
 }
