@@ -2,6 +2,6 @@ run: build
 	@ ./bin/http
 
 build:
-	go build -o ./bin/http .
+	@ go build -o ./bin/http ./app/
 
 
