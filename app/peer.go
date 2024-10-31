@@ -47,7 +47,7 @@ func (p *Peer) ReadConn() {
 func (p *Peer) WriteConn(msg *[]byte) {
 	defer p.Cancel()
 
-	const headers string = "HTTP/1.1 200 OK \r\n\r\n"
+	const headers string = "HTTP/1.1 200 OK\r\n\r\n"
 	headersLen := len(headers)
 	ans := make([]byte, 0, headersLen+len(*msg))
 
