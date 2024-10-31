@@ -7,5 +7,9 @@ func main() {
 		ListenAddr: ":4221",
 	})
 
+	server.Router.Add("/")
+	server.Router.Add("/user")
+	server.Router.Add("/product")
+
 	log.Fatal(server.Start())
 }

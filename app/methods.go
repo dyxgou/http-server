@@ -33,5 +33,5 @@ func (m Method) String() string {
 }
 
 func (m Method) GetLen() int {
-	return len(m.String()) + 1
+	return len(m.String())
 }

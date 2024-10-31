@@ -14,6 +14,7 @@ type Config struct {
 
 type Server struct {
 	Config
+	Router
 	Ln  net.Listener
 	Ctx context.Context
 
@@ -28,6 +29,7 @@ func CreateServer(cfg Config) *Server {
 
 	return &Server{
 		Config: cfg,
+		Router: NewRoutes(),
 		Ctx:    context.Background(),
 		quitch: make(chan struct{}),
 	}

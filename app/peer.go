@@ -8,8 +8,9 @@ import (
 )
 
 type Peer struct {
-	conn  net.Conn
-	reqch chan *Request
+	conn   net.Conn
+	reqch  chan *Request
+	parser Parser
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -19,8 +20,9 @@ func NewPeer(parentCtx context.Context, conn net.Conn) *Peer {
 	ctx, cancel := context.WithCancel(parentCtx)
 
 	return &Peer{
-		conn:  conn,
-		reqch: make(chan *Request, 10),
+		conn:   conn,
+		reqch:  make(chan *Request, 10),
+		parser: NewRequestParser(),
 
 		ctx:    ctx,
 		cancel: cancel,
@@ -45,16 +47,12 @@ func (p *Peer) ReadConn() {
 				return
 			}
 
-			m, err := GetMethod(buf[0])
+			req, err := p.parser.Parse(buf, n)
 
 			if err != nil {
-				slog.Error("reading err err", "err", err)
+				slog.Error("parsing request err", "err", err)
 				return
 			}
-
-			msgBuf := make([]byte, n)
-			copy(msgBuf, buf[m.GetLen():])
-			req := NewRequest(m, msgBuf)
 
 			p.reqch <- req
 		}
