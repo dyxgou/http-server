@@ -17,7 +17,7 @@ type Server struct {
 	Ln  net.Listener
 	Ctx context.Context
 
-	msgCh  chan []byte
+	msgch  chan []byte
 	quitch chan struct{}
 }
 
@@ -29,7 +29,6 @@ func CreateServer(cfg Config) *Server {
 	return &Server{
 		Config: cfg,
 		Ctx:    context.Background(),
-		msgCh:  make(chan []byte, 10),
 		quitch: make(chan struct{}),
 	}
 }
@@ -48,16 +47,13 @@ func (s *Server) Start() error {
 	s.acceptConns()
 
 	<-s.quitch
-	close(s.msgCh)
+	close(s.msgch)
 	close(s.quitch)
 
 	return nil
 }
 
 func (s *Server) acceptConns() {
-	ctx, cancel := context.WithCancel(s.Ctx)
-	defer cancel()
-
 	for {
 		conn, err := s.Ln.Accept()
 
@@ -68,16 +64,13 @@ func (s *Server) acceptConns() {
 
 		slog.Info("conn acccepted", "addr", conn.RemoteAddr())
 
-		go s.handleConn(ctx, conn)
+		go s.handleConn(conn)
 	}
 }
 
-func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
-	peer := CreatePeer(ctx, conn, s.msgCh)
+func (s *Server) handleConn(conn net.Conn) {
+	peer := NewPeer(s.Ctx, conn)
 
 	go peer.ReadConn()
-
-	for msg := range s.msgCh {
-		peer.WriteConn(&msg)
-	}
+	go peer.HandleMsg()
 }

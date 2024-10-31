@@ -2,62 +2,85 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 )
 
 type Peer struct {
-	Conn   net.Conn
-	MsgCh  chan []byte
-	Ctx    context.Context
-	Cancel context.CancelFunc
+	conn  net.Conn
+	reqch chan *Request
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
-func CreatePeer(ctx context.Context, conn net.Conn, msgch chan []byte) *Peer {
-	ctx, cancel := context.WithCancel(ctx)
+func NewPeer(parentCtx context.Context, conn net.Conn) *Peer {
+	ctx, cancel := context.WithCancel(parentCtx)
 
 	return &Peer{
-		Conn:   conn,
-		MsgCh:  msgch,
-		Ctx:    ctx,
-		Cancel: cancel,
+		conn:  conn,
+		reqch: make(chan *Request, 10),
+
+		ctx:    ctx,
+		cancel: cancel,
 	}
 }
 
 func (p *Peer) ReadConn() {
-	defer p.Cancel()
-	buf := make([]byte, 1024)
+	defer p.cancel()
+	defer p.conn.Close()
+
+	buf := make([]byte, 2048)
 
 	for {
-		n, err := p.Conn.Read(buf)
-
-		if err != nil {
-			slog.Error("reading conn err", "err", err)
+		select {
+		case <-p.ctx.Done():
 			return
+		default:
+			n, err := p.conn.Read(buf)
+
+			if err != nil {
+				slog.Error("reading conn err", "err", err)
+				return
+			}
+
+			m, err := GetMethod(buf[0])
+
+			if err != nil {
+				slog.Error("reading err err", "err", err)
+				return
+			}
+
+			msgBuf := make([]byte, n)
+			copy(msgBuf, buf[m.GetLen():])
+			req := NewRequest(m, msgBuf)
+
+			p.reqch <- req
 		}
-
-		slog.Info("message from", "addr", p.Conn.RemoteAddr())
-		msgBuf := make([]byte, n)
-
-		copy(msgBuf, buf[:n])
-		p.MsgCh <- msgBuf
 	}
 }
 
-func (p *Peer) WriteConn(msg *[]byte) {
-	defer p.Cancel()
+func (p *Peer) WriteConn(req *Request) {
+	defer p.cancel()
 
-	const headers string = "HTTP/1.1 200 OK\r\n\r\n"
-	headersLen := len(headers)
-	ans := make([]byte, 0, headersLen+len(*msg))
-
-	ans = append(ans, []byte(headers)...)
-	ans = append(ans, *msg...)
-
-	_, err := p.Conn.Write(ans)
-
-	if err != nil {
-		slog.Error("writing conn", "err", err)
+	select {
+	case <-p.ctx.Done():
 		return
+	default:
+
+	}
+}
+
+func (p *Peer) HandleMsg() {
+	defer p.cancel()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case msg := <-p.reqch:
+			fmt.Println(msg)
+		}
 	}
 }
