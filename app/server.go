@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
 )
@@ -19,7 +18,7 @@ type Server struct {
 	Ctx context.Context
 
 	msgCh  chan []byte
-	quitch chan<- struct{}
+	quitch chan struct{}
 }
 
 func CreateServer(cfg Config) *Server {
@@ -31,6 +30,7 @@ func CreateServer(cfg Config) *Server {
 		Config: cfg,
 		Ctx:    context.Background(),
 		msgCh:  make(chan []byte, 10),
+		quitch: make(chan struct{}),
 	}
 }
 
@@ -46,6 +46,11 @@ func (s *Server) Start() error {
 	slog.Info("The server has started on", "addr", s.ListenAddr)
 
 	s.acceptConns()
+
+	<-s.quitch
+	close(s.msgCh)
+	close(s.quitch)
+
 	return nil
 }
 
@@ -68,14 +73,11 @@ func (s *Server) acceptConns() {
 }
 
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
-	peer := CreatePeer(conn, s.msgCh)
+	peer := CreatePeer(ctx, conn, s.msgCh)
 
-	go peer.ReadConn(ctx)
+	go peer.ReadConn()
 
-	select {
-	case <-ctx.Done():
-		return
-	case msg := <-s.msgCh:
-		fmt.Println(string(msg))
+	for msg := range s.msgCh {
+		peer.WriteConn(&msg)
 	}
 }
